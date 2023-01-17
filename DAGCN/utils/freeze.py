@@ -1,5 +1,5 @@
-
 from collections import Iterable
+
 
 def set_freeze_by_id(model, layer_num_last):
     for param in model.parameters():

@@ -1,6 +1,3 @@
-#!/usr/bin/python
-# -*- coding:utf-8 -*-
-
 import logging
 import os
 import time
@@ -14,11 +11,6 @@ import models
 import datasets
 from utils.save import Save_Tool
 from loss.DAN import DAN
-
-
-
-
-
 
 
 class train_utils(object):
@@ -46,16 +38,14 @@ class train_utils(object):
             self.device_count = 1
             logging.info('using {} cpu'.format(self.device_count))
 
-
         # Load the datasets
         Dataset = getattr(datasets, args.data_name)
         self.datasets = {}
-        if isinstance(args.transfer_task[0],str):
-           print(args.transfer_task)
-           args.transfer_task= eval("".join(args.transfer_task))
-        self.datasets['source_train'], self.datasets['source_val'], self.datasets['target_train'], self.datasets['target_val'] = Dataset(args.data_dir, args.transfer_task, args.normlizetype).data_split(transfer_learning=True)
-
-
+        if isinstance(args.transfer_task[0], str):
+            print(args.transfer_task)
+            args.transfer_task = eval("".join(args.transfer_task))
+        self.datasets['source_train'], self.datasets['source_val'], self.datasets['target_train'], self.datasets['target_val'] = Dataset(
+            args.data_dir, args.transfer_task, args.normlizetype).data_split(transfer_learning=True)
         self.dataloaders = {x: torch.utils.data.DataLoader(self.datasets[x], batch_size=args.batch_size,
                                                            shuffle=(True if x.split('_')[1] == 'train' else False),
                                                            num_workers=args.num_workers,
@@ -76,8 +66,8 @@ class train_utils(object):
 
         if args.domain_adversarial:
             self.max_iter = len(self.dataloaders['source_train'])*(args.max_epoch-args.middle_epoch)
-            self.AdversarialNet = getattr(models, 'AdversarialNet')(in_feature=self.model.output_num(),
-                                                                        hidden_size=args.hidden_size, max_iter=self.max_iter)
+            self.AdversarialNet = getattr(models, 'AdversarialNet')(in_feature=self.model.output_num(),  # 此处应是 in_feature=args.bottleneck_num，但都是256所以不影响
+                                                                    hidden_size=args.hidden_size, max_iter=self.max_iter)
 
         if self.device_count > 1:
             self.model = torch.nn.DataParallel(self.model)
@@ -91,22 +81,21 @@ class train_utils(object):
         if args.domain_adversarial:
             if args.bottleneck:
                 parameter_list = [{"params": self.model.parameters(), "lr": args.lr},
-                                  {"params": self.bottleneck_layer.parameters(), "lr": args.lr},
-                                  {"params": self.classifier_layer.parameters(), "lr": args.lr},
+                                  {"params": self.bottleneck_layer.parameters(),"lr": args.lr},
+                                  {"params": self.classifier_layer.parameters(),"lr": args.lr},
                                   {"params": self.AdversarialNet.parameters(), "lr": args.lr}]
             else:
                 parameter_list = [{"params": self.model.parameters(), "lr": args.lr},
-                                  {"params": self.classifier_layer.parameters(), "lr": args.lr},
+                                  {"params": self.classifier_layer.parameters(),"lr": args.lr},
                                   {"params": self.AdversarialNet.parameters(), "lr": args.lr}]
         else:
             if args.bottleneck:
                 parameter_list = [{"params": self.model.parameters(), "lr": args.lr},
-                                  {"params": self.bottleneck_layer.parameters(), "lr": args.lr},
+                                  {"params": self.bottleneck_layer.parameters(),"lr": args.lr},
                                   {"params": self.classifier_layer.parameters(), "lr": args.lr}]
             else:
                 parameter_list = [{"params": self.model.parameters(), "lr": args.lr},
                                   {"params": self.classifier_layer.parameters(), "lr": args.lr}]
-
 
         # Define the optimizer
         if args.opt == 'sgd':
@@ -117,7 +106,6 @@ class train_utils(object):
                                         weight_decay=args.weight_decay)
         else:
             raise Exception("optimizer not implement")
-
 
         # Define the learning rate decay
         if args.lr_scheduler == 'step':
@@ -138,7 +126,6 @@ class train_utils(object):
         else:
             raise Exception("lr schedule not implement")
 
-
         # Load the checkpoint
         self.start_epoch = 0
         if args.resume:
@@ -151,7 +138,6 @@ class train_utils(object):
             elif suffix == 'pth':
                 self.model_all.load_state_dict(torch.load(args.resume, map_location=args.device))
 
-
         # Invert the model and define the loss
         self.model.to(self.device)
         if args.bottleneck:
@@ -161,13 +147,11 @@ class train_utils(object):
         self.classifier_layer.to(self.device)
 
         # Define the adversarial loss
-
         self.adversarial_loss = nn.BCELoss()
 
         self.structure_loss = DAN
 
         self.criterion = nn.CrossEntropyLoss()
-
 
     def train(self):
         """
@@ -185,8 +169,11 @@ class train_utils(object):
 
         save_list = Save_Tool(max_num=args.max_model_num)
         iter_num = 0
+
         for epoch in range(self.start_epoch, args.max_epoch):
-            logging.info('-'*5 + 'Epoch {}/{}'.format(epoch, args.max_epoch - 1) + '-'*5)
+
+            logging.info('-'*5 + 'Epoch {}/{}'.format(epoch,args.max_epoch - 1) + '-'*5)
+
             # Update the learning rate
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step(epoch)
@@ -196,8 +183,10 @@ class train_utils(object):
 
             iter_target = iter(self.dataloaders['target_train'])
             len_target_loader = len(self.dataloaders['target_train'])
+
             # Each epoch has a training and val phase
             for phase in ['source_train', 'source_val', 'target_val']:
+
                 # Define the temp variable
                 epoch_start = time.time()
                 epoch_acc = 0
@@ -220,15 +209,13 @@ class train_utils(object):
                         self.AdversarialNet.eval()
                     self.classifier_layer.eval()
 
-
-
                 for batch_idx, (inputs, labels) in enumerate(self.dataloaders[phase]):
                     if phase != 'source_train' or epoch < args.middle_epoch:
                         inputs = inputs.to(self.device)
                         labels = labels.to(self.device)
                     else:
                         source_inputs = inputs
-                        target_inputs, target_labels = iter_target.next()
+                        target_inputs, target_labels = next(iter_target)
                         inputs = torch.cat((source_inputs, target_inputs), dim=0)
                         inputs = inputs.to(self.device)
                         labels = labels.to(self.device)
@@ -245,33 +232,30 @@ class train_utils(object):
                         if phase != 'source_train' or epoch < args.middle_epoch:
                             logits = outputs
                             loss = self.criterion(logits, labels)
-
                         else:
                             logits = outputs.narrow(0, 0, labels.size(0))
                             classifier_loss = self.criterion(logits, labels)
-                            #-----------------------------------------------------
+
                         if phase == 'source_train' and epoch >= args.middle_epoch:
 
                             # Calculate the domain adversarial
-
                             domain_label_source = torch.ones(labels.size(0)).float()
                             domain_label_target = torch.zeros(inputs.size(0)-labels.size(0)).float()
                             adversarial_label = torch.cat((domain_label_source, domain_label_target), dim=0).to(self.device)
                             adversarial_out = self.AdversarialNet(features)
-                            adversarial_loss = self.adversarial_loss(adversarial_out, adversarial_label)
+                            adversarial_loss = self.adversarial_loss(adversarial_out.squeeze(), adversarial_label)
+
                             structure_loss = self.structure_loss(features.narrow(0, 0, labels.size(0)),
-                                                               features.narrow(0, labels.size(0),inputs.size(0) - labels.size(0)))
+                                                                 features.narrow(0, labels.size(0), inputs.size(0) - labels.size(0)))
 
                             if args.trade_off_adversarial == 'Cons':
                                 lam_adversarial = args.lam_adversarial
                             elif args.trade_off_adversarial == 'Step':
-                                lam_adversarial = 2 / (1 + math.exp(-10 * ((epoch-args.middle_epoch) /
-                                                                        (args.max_epoch-args.middle_epoch)))) - 1
+                                lam_adversarial = 2 / (1 + math.exp(-10 * ((epoch-args.middle_epoch) / (args.max_epoch-args.middle_epoch)))) - 1
                             else:
                                 raise Exception("loss not implement")
 
-
-                            loss = classifier_loss  + lam_adversarial * adversarial_loss + lam_adversarial * structure_loss
+                            loss = classifier_loss + lam_adversarial * adversarial_loss + lam_adversarial * structure_loss
 
                         pred = logits.argmax(dim=1)
                         correct = torch.eq(pred, labels).float().sum().item()
@@ -301,22 +285,21 @@ class train_utils(object):
                                 sample_per_sec = 1.0 * batch_count / train_time
                                 logging.info('Epoch: {} [{}/{}], Train Loss: {:.4f} Train Acc: {:.4f},'
                                              '{:.1f} examples/sec {:.2f} sec/batch'.format(
-                                    epoch, batch_idx * len(labels), len(self.dataloaders[phase].dataset),
-                                    batch_loss, batch_acc, sample_per_sec, batch_time
-                                ))
+                                                 epoch, batch_idx * len(labels), 
+                                                 len(self.dataloaders[phase].dataset),
+                                                 batch_loss, batch_acc, sample_per_sec, batch_time
+                                             ))
                                 batch_acc = 0
                                 batch_loss = 0.0
                                 batch_count = 0
                             step += 1
 
                 # Print the train and val information via each epoch
-
                 epoch_loss = epoch_loss / epoch_length
                 epoch_acc = epoch_acc / epoch_length
-
                 logging.info('Epoch: {} {}-Loss: {:.4f} {}-Acc: {:.4f}, Cost {:.1f} sec'.format(
-                    epoch, phase, epoch_loss, phase, epoch_acc, time.time() - epoch_start
-                ))
+                    epoch, phase, epoch_loss, phase, epoch_acc, time.time() - epoch_start))
+
                 # save the model
                 if phase == 'target_val':
                     # save the checkpoint for other learning
@@ -328,26 +311,10 @@ class train_utils(object):
                         'model_state_dict': model_state_dic
                     }, save_path)
                     save_list.update(save_path)
+
                     # save the best model according to the val accuracy
                     if (epoch_acc > best_acc or epoch > args.max_epoch-2) and (epoch > args.middle_epoch-1):
                         best_acc = epoch_acc
                         logging.info("save best model epoch {}, acc {:.4f}".format(epoch, epoch_acc))
                         torch.save(model_state_dic,
                                    os.path.join(self.save_dir, '{}-{:.4f}-best_model.pth'.format(epoch, best_acc)))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

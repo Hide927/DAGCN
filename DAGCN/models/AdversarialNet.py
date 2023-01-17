@@ -11,8 +11,9 @@ def grl_hook(coeff):
         return -coeff * grad.clone()
     return fun1
 
+
 class AdversarialNet(nn.Module):
-    def __init__(self, in_feature, hidden_size,max_iter = 10000.0):
+    def __init__(self, in_feature, hidden_size, max_iter=10000.0):
         super(AdversarialNet, self).__init__()
         self.ad_layer1 = nn.Sequential(
             nn.Linear(in_feature, hidden_size),
@@ -38,7 +39,8 @@ class AdversarialNet(nn.Module):
 
         if self.training:
             self.iter_num += 1
-        coeff = calc_coeff(self.iter_num, self.high, self.low, self.alpha, self.max_iter)
+        coeff = calc_coeff(self.iter_num, self.high,
+                           self.low, self.alpha, self.max_iter)
         x = x * 1.0
         x.register_hook(grl_hook(coeff))
 

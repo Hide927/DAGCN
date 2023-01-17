@@ -1,11 +1,8 @@
-#!/usr/bin/python
-# -*- coding:utf-8 -*-
 from torch import nn
 import warnings
 import torch
 from models.MRF_GCN import MRF_GCN
 from models.CNN import CNN
-
 
 
 class DAGCN_features(nn.Module):

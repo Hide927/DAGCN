@@ -1,7 +1,5 @@
-#!/usr/bin/python
-# -*- coding:utf-8 -*-
-
 import os
+
 
 class Save_Tool(object):
     def __init__(self, max_num=10):

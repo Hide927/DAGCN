@@ -2,7 +2,6 @@ import types
 import math
 from collections import Counter
 from functools import partial
-
 from torch.optim.optimizer import Optimizer
 
 
@@ -79,5 +78,3 @@ class transferLearning(_LRScheduler):
             return self.base_lrs
         return [lr * 1 / (1 + self.alpha*self.last_epoch/self.max_epoch) ** self.beta
                 for lr in self.param_lr]
-
-
