@@ -27,6 +27,7 @@ class AdversarialNet(nn.Module):
         )
         self.ad_layer3 = nn.Linear(hidden_size, 1)
         self.sigmoid = nn.Sigmoid()
+        
         # parameters
         self.iter_num = 0
         self.alpha = 10
@@ -43,7 +44,6 @@ class AdversarialNet(nn.Module):
                            self.low, self.alpha, self.max_iter)
         x = x * 1.0
         x.register_hook(grl_hook(coeff))
-
         x = self.ad_layer1(x)
         x = self.ad_layer2(x)
         y = self.ad_layer3(x)

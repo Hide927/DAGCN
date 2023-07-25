@@ -31,13 +31,11 @@ def Gen_edge(atrr):
     k = A.shape[0]
     values, indices = A_norm.topk(k, dim=1, largest=True, sorted=False)
     edge_index = torch.tensor([[], []], dtype=torch.long)
-
     for i in range(indices.shape[0]):
         index_1 = torch.zeros(indices.shape[1], dtype=torch.long) + i
         index_2 = indices[i]
         sub_index = torch.stack([index_1, index_2])
         edge_index = torch.cat([edge_index, sub_index], axis=1)
-
     return values, edge_index
 
 
@@ -79,7 +77,6 @@ class MRF_GCN(nn.Module):
         super(MRF_GCN, self).__init__()
         if pretrained == True:
             warnings.warn("Pretrained model is not available")
-
         self.atrr = GGL()
         self.conv1 = MultiChev(in_channel)
         self.bn1 = BatchNorm(1200)
@@ -91,7 +88,6 @@ class MRF_GCN(nn.Module):
             nn.Dropout())
 
     def forward(self, x):
-
         edge_atrr, edge_index = self.atrr(x)
         edge_atrr = edge_atrr.cuda()
         edge_index = edge_index.cuda()

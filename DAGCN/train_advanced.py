@@ -24,8 +24,8 @@ def parse_args():
                         default="D:\Data\西储大学轴承数据中心网站", help='the directory of the data')
     parser.add_argument('--transfer_task', type=list,
                         default=[[2], [1]], help='transfer learning tasks')
-    parser.add_argument('--normlizetype', type=str,
-                        default='mean-std', help='nomalization type')
+    parser.add_argument('--normalizetype', type=str,
+                        default='mean-std', help='normalization type')
 
     # training parameters
     parser.add_argument('--cuda_device', type=str,
@@ -42,15 +42,15 @@ def parse_args():
     parser.add_argument('--bottleneck', type=bool, default=True,
                         help='whether using the bottleneck layer')
     parser.add_argument('--bottleneck_num', type=int,
-                        default=256*1, help='whether using the bottleneck layer')
-    parser.add_argument('--last_batch', type=bool,
-                        default=False, help='whether using the last batch')
+                        default=256*1, help='the output number of bottleneck layer')
+    parser.add_argument('--drop_last', type=bool,
+                        default=False, help='whether drop the last batch')
 
     # domain adversarial parameters
     parser.add_argument('--domain_adversarial', type=bool,
                         default=True, help='whether use domain_adversarial')
     parser.add_argument('--hidden_size', type=int,
-                        default=1024, help='whether using the last batch')
+                        default=1024, help='hidden size')
     parser.add_argument('--trade_off_adversarial',
                         type=str, default='Cons', help='')
     parser.add_argument('--lam_adversarial', type=float,
@@ -78,7 +78,7 @@ def parse_args():
     parser.add_argument('--max_model_num', type=int, default=1,
                         help='the number of most recent models to save')
     parser.add_argument('--middle_epoch', type=int,
-                        default=1, help='max number of epoch')
+                        default=1, help='epoch for source pretrain')
     parser.add_argument('--max_epoch', type=int,
                         default=300, help='max number of epoch')
     parser.add_argument('--print_step', type=int, default=50,
@@ -89,7 +89,6 @@ def parse_args():
 
 
 if __name__ == '__main__':
-
     args = parse_args()
     os.environ['CUDA_VISIBLE_DEVICES'] = args.cuda_device.strip()
     # Prepare the saving path for the model

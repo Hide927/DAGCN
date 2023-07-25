@@ -42,15 +42,14 @@ class train_utils(object):
         Dataset = getattr(datasets, args.data_name)
         self.datasets = {}
         if isinstance(args.transfer_task[0], str):
-            print(args.transfer_task)
             args.transfer_task = eval("".join(args.transfer_task))
         self.datasets['source_train'], self.datasets['source_val'], self.datasets['target_train'], self.datasets['target_val'] = Dataset(
-            args.data_dir, args.transfer_task, args.normlizetype).data_split(transfer_learning=True)
+            args.data_dir, args.transfer_task, args.normalizetype).data_split(transfer_learning=True)
         self.dataloaders = {x: torch.utils.data.DataLoader(self.datasets[x], batch_size=args.batch_size,
                                                            shuffle=(True if x.split('_')[1] == 'train' else False),
                                                            num_workers=args.num_workers,
                                                            pin_memory=(True if self.device == 'cuda' else False),
-                                                           drop_last=(True if args.last_batch and x.split('_')[1] == 'train' else False))
+                                                           drop_last=(True if args.drop_last and x.split('_')[1] == 'train' else False))
                             for x in ['source_train', 'source_val', 'target_train', 'target_val']}
 
         # Define the model
@@ -66,7 +65,11 @@ class train_utils(object):
 
         if args.domain_adversarial:
             self.max_iter = len(self.dataloaders['source_train'])*(args.max_epoch-args.middle_epoch)
-            self.AdversarialNet = getattr(models, 'AdversarialNet')(in_feature=self.model.output_num(),  # 此处应是 in_feature=args.bottleneck_num，但都是256所以不影响
+            if args.bottleneck:
+                self.AdversarialNet = getattr(models, 'AdversarialNet')(in_feature=args.bottleneck_num,
+                                                                    hidden_size=args.hidden_size, max_iter=self.max_iter)
+            else:
+                self.AdversarialNet = getattr(models, 'AdversarialNet')(in_feature=self.model.output_num(),
                                                                     hidden_size=args.hidden_size, max_iter=self.max_iter)
 
         if self.device_count > 1:
@@ -148,9 +151,7 @@ class train_utils(object):
 
         # Define the adversarial loss
         self.adversarial_loss = nn.BCELoss()
-
         self.structure_loss = DAN
-
         self.criterion = nn.CrossEntropyLoss()
 
     def train(self):
@@ -162,13 +163,14 @@ class train_utils(object):
 
         step = 0
         best_acc = 0.0
+
         batch_count = 0
         batch_loss = 0.0
         batch_acc = 0
+
         step_start = time.time()
 
         save_list = Save_Tool(max_num=args.max_model_num)
-        iter_num = 0
 
         for epoch in range(self.start_epoch, args.max_epoch):
 
@@ -210,6 +212,7 @@ class train_utils(object):
                     self.classifier_layer.eval()
 
                 for batch_idx, (inputs, labels) in enumerate(self.dataloaders[phase]):
+                    
                     if phase != 'source_train' or epoch < args.middle_epoch:
                         inputs = inputs.to(self.device)
                         labels = labels.to(self.device)
@@ -223,7 +226,8 @@ class train_utils(object):
                         iter_target = iter(self.dataloaders['target_train'])
 
                     with torch.set_grad_enabled(phase == 'source_train'):
-                        # forward
+                        
+                        # Forward
                         features = self.model(inputs)
                         if args.bottleneck:
                             features = self.bottleneck_layer(features)
@@ -238,13 +242,14 @@ class train_utils(object):
 
                         if phase == 'source_train' and epoch >= args.middle_epoch:
 
-                            # Calculate the domain adversarial
+                            # Calculate the domain adversarial loss
                             domain_label_source = torch.ones(labels.size(0)).float()
                             domain_label_target = torch.zeros(inputs.size(0)-labels.size(0)).float()
                             adversarial_label = torch.cat((domain_label_source, domain_label_target), dim=0).to(self.device)
                             adversarial_out = self.AdversarialNet(features)
                             adversarial_loss = self.adversarial_loss(adversarial_out.squeeze(), adversarial_label)
 
+                            # Calculate the structure loss
                             structure_loss = self.structure_loss(features.narrow(0, 0, labels.size(0)),
                                                                  features.narrow(0, labels.size(0), inputs.size(0) - labels.size(0)))
 
@@ -266,7 +271,7 @@ class train_utils(object):
 
                         # Calculate the training information
                         if phase == 'source_train':
-                            # backward
+                            # Backward
                             self.optimizer.zero_grad()
                             loss.backward()
                             self.optimizer.step()
@@ -284,7 +289,7 @@ class train_utils(object):
                                 batch_time = train_time / args.print_step if step != 0 else train_time
                                 sample_per_sec = 1.0 * batch_count / train_time
                                 logging.info('Epoch: {} [{}/{}], Train Loss: {:.4f} Train Acc: {:.4f},'
-                                             '{:.1f} examples/sec {:.2f} sec/batch'.format(
+                                             '{:.1f} samples/sec {:.2f} sec/batch'.format(
                                                  epoch, batch_idx * len(labels), 
                                                  len(self.dataloaders[phase].dataset),
                                                  batch_loss, batch_acc, sample_per_sec, batch_time
@@ -300,9 +305,9 @@ class train_utils(object):
                 logging.info('Epoch: {} {}-Loss: {:.4f} {}-Acc: {:.4f}, Cost {:.1f} sec'.format(
                     epoch, phase, epoch_loss, phase, epoch_acc, time.time() - epoch_start))
 
-                # save the model
+                # Save the model
                 if phase == 'target_val':
-                    # save the checkpoint for other learning
+                    # Save the checkpoint for other learning
                     model_state_dic = self.model_all.state_dict()
                     save_path = os.path.join(self.save_dir, '{}_ckpt.tar'.format(epoch))
                     torch.save({
@@ -312,7 +317,7 @@ class train_utils(object):
                     }, save_path)
                     save_list.update(save_path)
 
-                    # save the best model according to the val accuracy
+                    # Save the best model according to the val accuracy
                     if (epoch_acc > best_acc or epoch > args.max_epoch-2) and (epoch > args.middle_epoch-1):
                         best_acc = epoch_acc
                         logging.info("save best model epoch {}, acc {:.4f}".format(epoch, epoch_acc))

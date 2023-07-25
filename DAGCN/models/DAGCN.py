@@ -10,7 +10,6 @@ class DAGCN_features(nn.Module):
         super(DAGCN_features, self).__init__()
         self.model_cnn = CNN(pretrained)
         self.model_GCN = MRF_GCN(pretrained)
-
         self.__in_features = 256*1
 
     def forward(self, x):

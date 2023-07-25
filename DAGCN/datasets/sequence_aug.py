@@ -15,7 +15,6 @@ class Compose(object):
 
 class Reshape(object):
     def __call__(self, seq):
-        # print(seq.shape)
         return seq.transpose()
 
 
@@ -122,6 +121,7 @@ class Normalize(object):
             raise NameError('This normalization is not included!')
 
         return seq
+
 
 # class Scale(object):
 #     def __init__(self, factor=1.0):
